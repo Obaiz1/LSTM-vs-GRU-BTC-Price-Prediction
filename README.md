@@ -116,11 +116,19 @@ uvicorn deployment.api:app --host 0.0.0.0 --port 8000
 # Swagger UI: http://localhost:8000/docs
 ```
 
-| Method | Path       | Description |
-|--------|------------|-------------|
-| GET    | `/`        | Project metadata, endpoints, status |
-| GET    | `/health`  | API status + whether model/scaler files exist |
-| POST   | `/predict` | Next-price prediction + Up/Down trend + model version |
+| Method | Path             | Description |
+|--------|------------------|-------------|
+| GET    | `/`              | Project metadata, endpoints, status |
+| GET    | `/health`        | API status + whether model/scaler files exist |
+| POST   | `/predict`       | Next-price prediction + Up/Down trend + model version |
+| GET    | `/metrics`       | V1 vs V2 test metrics, run params + plain-language verdict |
+| GET    | `/diagnostics`   | Training/validation loss curves + prediction-vs-actual arrays |
+| GET    | `/correlation`   | 9-feature correlation matrix (heatmap) |
+| GET    | `/price-history` | Recent BTC closes (forecast chart) |
+| GET    | `/runs`          | MLflow-style run cards (champion + baseline) |
+
+The analytics endpoints serve precomputed JSON from `artifacts/` (written by the
+training scripts), so the dashboard works offline inside Docker / Kubernetes.
 
 **`/predict` input modes** (sequence models need 60 timesteps):
 1. `{"sequence": [ {…} × 60 ]}` — fully offline, used directly.
@@ -139,14 +147,30 @@ curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" \
   "message": "Academic prediction only, not financial advice" }
 ```
 
-## 11. React Frontend
+## 11. React Frontend (QuantForecaster dashboard)
+
+A Vite + React + Tailwind + Recharts single-page analytics dashboard with four tabs:
+
+- **Forecast** — prediction form (or live data), result card, price-history + forecast chart.
+- **Model Comparison** — MAE/RMSE bars, R² gauges, feature-correlation heatmap, LSTM-vs-GRU deep-dive.
+- **Training Diagnostics** — train/validation loss curves (early-stop marker) + prediction-vs-actual.
+- **Experiments** — MLflow-style run cards (champion / baseline) with hyperparameters.
 
 ```bash
 cd frontend
 npm install
 npm run dev        # http://localhost:5173 (proxies /api -> :8000)
 ```
-Pick the model, enter features or use live data, and view the prediction card.
+
+If your API is on a different port (e.g. a container on 8010), point the UI at it:
+
+```bash
+# bash
+VITE_API_BASE=http://localhost:8010 npm run dev
+# PowerShell
+$env:VITE_API_BASE="http://localhost:8010"; npm run dev
+```
+
 Details: [frontend/README.md](frontend/README.md).
 
 ## 12. Streamlit Dashboard (original, preserved)
