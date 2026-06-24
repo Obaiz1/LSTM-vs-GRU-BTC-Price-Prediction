@@ -10,8 +10,9 @@ Academic project — NOT financial advice.
 
 from __future__ import annotations
 
+import json
 import os
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -100,3 +101,89 @@ def evaluate_on_test(model, data: Dict) -> Tuple[np.ndarray, Dict[str, float]]:
         "directional_accuracy": dir_acc,
     }
     return preds, metrics
+
+
+# --------------------------------------------------------------------------- #
+# Dashboard analytics export (consumed by the FastAPI analytics endpoints)
+# --------------------------------------------------------------------------- #
+def _to_float_list(arr) -> List[float]:
+    return [float(x) for x in np.asarray(arr).flatten()]
+
+
+def _downsample(values: List, max_points: int = 240) -> List:
+    """Evenly thin a list to at most ``max_points`` so charts stay light."""
+    n = len(values)
+    if n <= max_points:
+        return values
+    step = n / max_points
+    return [values[min(int(i * step), n - 1)] for i in range(max_points)]
+
+
+def export_run_analytics(
+    version_key: str,
+    run_name: str,
+    params: Dict,
+    metrics: Dict,
+    history,
+    y_true,
+    preds,
+    test_dates=None,
+    train_time_sec: Optional[float] = None,
+) -> None:
+    """Persist per-run JSON (loss curve, eval arrays, run metadata) for the UI."""
+    ensure_dirs()
+    hist = getattr(history, "history", {}) or {}
+    loss = [float(x) for x in hist.get("loss", [])]
+    val_loss = [float(x) for x in hist.get("val_loss", [])]
+    epochs = len(loss)
+    early_stop_epoch = (val_loss.index(min(val_loss)) + 1) if val_loss else epochs
+
+    with open(os.path.join(ARTIFACTS_DIR, f"history_{version_key}.json"), "w") as f:
+        json.dump({
+            "loss": loss, "val_loss": val_loss,
+            "epochs": epochs, "early_stop_epoch": early_stop_epoch,
+        }, f)
+
+    y_true_l = _to_float_list(y_true)
+    preds_l = _to_float_list(preds)
+    dates_l = (
+        [str(d)[:10] for d in np.asarray(test_dates).flatten()]
+        if test_dates is not None else []
+    )
+    with open(os.path.join(ARTIFACTS_DIR, f"eval_{version_key}.json"), "w") as f:
+        json.dump({
+            "y_true": _downsample(y_true_l),
+            "y_pred": _downsample(preds_l),
+            "dates": _downsample(dates_l) if dates_l else [],
+            "n_test": len(y_true_l),
+        }, f)
+
+    with open(os.path.join(ARTIFACTS_DIR, f"run_{version_key}.json"), "w") as f:
+        json.dump({
+            "version_key": version_key,
+            "name": run_name,
+            "params": params,
+            "metrics": metrics,
+            "val_loss": (val_loss[early_stop_epoch - 1] if val_loss else None),
+            "train_time_sec": round(train_time_sec, 1) if train_time_sec else None,
+        }, f, indent=2)
+    print(f"[analytics] Exported history/eval/run JSON for {version_key}.")
+
+
+def export_shared_data() -> None:
+    """Persist model-independent analytics: feature correlation + recent prices."""
+    ensure_dirs()
+    from src.preprocessing import FEATURE_COLS, engineer_features, load_btc_data
+    try:
+        feats = engineer_features(load_btc_data())
+        corr = feats[FEATURE_COLS].corr().round(4)
+        with open(os.path.join(ARTIFACTS_DIR, "correlation.json"), "w") as f:
+            json.dump({"labels": list(FEATURE_COLS),
+                       "matrix": corr.values.tolist()}, f)
+        tail = feats.tail(120)
+        with open(os.path.join(ARTIFACTS_DIR, "price_history.json"), "w") as f:
+            json.dump({"dates": [str(d)[:10] for d in tail["Date"].values],
+                       "close": [float(x) for x in tail["Close"].values]}, f)
+        print("[analytics] Exported correlation + price_history JSON.")
+    except Exception as exc:  # network failure must not break training
+        print(f"[analytics] Skipped shared data export: {exc}")

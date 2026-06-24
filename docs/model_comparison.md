@@ -46,10 +46,13 @@ numbers will vary slightly because live data grows over time._
 
 | Metric                 | V1 — LSTM baseline | V2 — GRU improved | Better |
 |------------------------|--------------------|-------------------|--------|
-| MAE (USD)              | 5,226.52           | **3,318.22**      | V2 ✅  |
-| RMSE (USD)             | 6,243.31           | **4,019.36**      | V2 ✅  |
-| R²                     | 0.8606             | **0.9422**        | V2 ✅  |
-| Directional accuracy   | 0.5024             | 0.4976            | ~tie   |
+| MAE (USD)              | 5,763.94           | **4,305.68**      | V2 ✅  |
+| RMSE (USD)             | 6,770.52           | **5,172.28**      | V2 ✅  |
+| R²                     | 0.8357             | **0.9041**        | V2 ✅  |
+| Directional accuracy   | 0.4952             | 0.5064            | ~tie   |
+
+_The dashboard's "Model Comparison" tab reads these numbers live from
+`artifacts/metrics_v*.json`, so it always reflects your latest training run._
 
 > Reference (from the original repo's `metrics.json`, single-layer LSTM vs GRU
 > on the legacy feature set): LSTM RMSE ≈ **9,506**, R² ≈ **0.69**; GRU RMSE ≈
@@ -64,7 +67,7 @@ click **Compare**, and copy the metric values; or read the JSON files above.
 ## 4. Which model performed better?
 
 On this dataset the **GRU (V2)** model performed clearly better on the price-level
-metrics — **~36% lower MAE/RMSE and R² 0.94 vs 0.86** — because the dropout-
+metrics — **~25% lower MAE/RMSE and R² 0.90 vs 0.84** — because the dropout-
 regularized GRU with EarlyStopping/ReduceLROnPlateau generalizes better than the
 unregularized single-layer LSTM baseline. GRU's gating is also more parameter-
 efficient, which helps on a modest-sized daily dataset.

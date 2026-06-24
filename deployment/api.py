@@ -30,6 +30,8 @@ Academic project — NOT financial advice.
 
 from __future__ import annotations
 
+import json
+import os
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -40,6 +42,21 @@ from src import prediction_utils as pu
 
 PROJECT_NAME = "BTC Price Forecasting using LSTM and GRU with MLOps Deployment"
 DISCLAIMER = "Academic prediction only, not financial advice"
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ARTIFACTS_DIR = os.path.join(_PROJECT_ROOT, "artifacts")
+
+
+def _read_artifact(filename: str):
+    """Load a JSON analytics artifact, or return None if it is not present yet."""
+    path = os.path.join(ARTIFACTS_DIR, filename)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
 
 app = FastAPI(
     title=PROJECT_NAME,
@@ -118,6 +135,10 @@ def root():
             "GET /": "project metadata",
             "GET /health": "service + artifact health",
             "POST /predict": "next-price prediction + trend",
+            "GET /metrics": "V1 vs V2 metrics, run params + verdict",
+            "GET /diagnostics": "training loss curves + prediction-vs-actual arrays",
+            "GET /correlation": "feature correlation matrix (heatmap)",
+            "GET /price-history": "recent BTC close prices (forecast chart)",
             "GET /docs": "interactive Swagger UI",
         },
         "status": "ok",
@@ -186,3 +207,78 @@ def predict(req: PredictRequest):
         ) from exc
 
     return result
+
+
+# --------------------------------------------------------------------------- #
+# Analytics endpoints (serve precomputed JSON artifacts for the dashboard)
+# --------------------------------------------------------------------------- #
+@app.get("/metrics")
+def metrics():
+    """V1 vs V2 test metrics + run metadata + a plain-language verdict."""
+    run_v1 = _read_artifact("run_v1.json")
+    run_v2 = _read_artifact("run_v2.json")
+    # Fall back to the bare metrics files if full run JSON isn't present.
+    m1 = (run_v1 or {}).get("metrics") or _read_artifact("metrics_v1.json")
+    m2 = (run_v2 or {}).get("metrics") or _read_artifact("metrics_v2.json")
+
+    verdict = None
+    if m1 and m2:
+        better = "V2 GRU" if m2.get("R2", 0) >= m1.get("R2", 0) else "V1 LSTM"
+        verdict = (
+            f"{better} generalizes better — R² "
+            f"{m2.get('R2', 0):.2f} vs {m1.get('R2', 0):.2f}. "
+            f"Directional accuracy is ~0.50 for both (no tradeable edge)."
+        )
+    return {
+        "v1": {"metrics": m1, "run": run_v1},
+        "v2": {"metrics": m2, "run": run_v2},
+        "verdict": verdict,
+        "disclaimer": DISCLAIMER,
+    }
+
+
+@app.get("/diagnostics")
+def diagnostics():
+    """Training/validation loss curves and prediction-vs-actual test arrays."""
+    return {
+        "v1": {
+            "history": _read_artifact("history_v1.json"),
+            "eval": _read_artifact("eval_v1.json"),
+        },
+        "v2": {
+            "history": _read_artifact("history_v2.json"),
+            "eval": _read_artifact("eval_v2.json"),
+        },
+    }
+
+
+@app.get("/correlation")
+def correlation():
+    """Feature correlation matrix for the heatmap (or 503 if not generated)."""
+    data = _read_artifact("correlation.json")
+    if data is None:
+        raise HTTPException(
+            status_code=503,
+            detail="correlation.json not found. Train a model to generate it.",
+        )
+    return data
+
+
+@app.get("/price-history")
+def price_history():
+    """Recent BTC close prices used by the forecast chart."""
+    data = _read_artifact("price_history.json")
+    if data is None:
+        raise HTTPException(
+            status_code=503,
+            detail="price_history.json not found. Train a model to generate it.",
+        )
+    return data
+
+
+@app.get("/runs")
+def runs():
+    """MLflow-style run cards (champion first), built from saved run JSON."""
+    items = [r for r in (_read_artifact("run_v2.json"),
+                         _read_artifact("run_v1.json")) if r]
+    return {"runs": items}

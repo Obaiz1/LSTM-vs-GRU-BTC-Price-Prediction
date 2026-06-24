@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 # Allow `python training/train_v2_gru.py` from the project root by ensuring the
 # project root is importable (so `src` and `training` packages resolve).
@@ -42,6 +43,8 @@ from training._common import (
     MODELS_DIR,
     ensure_dirs,
     evaluate_on_test,
+    export_run_analytics,
+    export_shared_data,
     save_loss_plot,
     save_pred_plot,
 )
@@ -106,6 +109,7 @@ def main():
                               min_lr=1e-5, verbose=1),
         ]
 
+        t0 = time.time()
         history = model.fit(
             data["X_train"], data["y_train"],
             validation_data=(data["X_val"], data["y_val"]),
@@ -114,6 +118,7 @@ def main():
             callbacks=callbacks,
             verbose=1,
         )
+        train_time = time.time() - t0
 
         preds, metrics = evaluate_on_test(model, data)
 
@@ -144,6 +149,25 @@ def main():
 
         with open(os.path.join(ARTIFACTS_DIR, "metrics_v2.json"), "w") as f:
             json.dump(metrics, f, indent=2)
+
+        # ---- persist analytics JSON consumed by the dashboard API ----
+        export_run_analytics(
+            version_key="v2",
+            run_name=MODEL_VERSION,
+            params={
+                "lookback": LOOKBACK, "epochs": EPOCHS, "batch_size": BATCH_SIZE,
+                "learning_rate": LEARNING_RATE, "optimizer": "Adam",
+                "dropout": DROPOUT, "architecture": ARCHITECTURE,
+                "improvements": IMPROVEMENTS,
+            },
+            metrics=metrics,
+            history=history,
+            y_true=data["y_test_raw"],
+            preds=preds,
+            test_dates=data.get("test_dates"),
+            train_time_sec=train_time,
+        )
+        export_shared_data()
 
         print("\n=== Model V2 (GRU improved) test metrics ===")
         for k, v in metrics.items():

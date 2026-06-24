@@ -1,5 +1,5 @@
 // Central API client. In dev, Vite proxies "/api" -> http://localhost:8000.
-// Override with VITE_API_BASE (e.g. the Minikube NodePort URL) at build time.
+// Override with VITE_API_BASE (e.g. the container/Minikube URL) at build time.
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
 async function request(path, options = {}) {
@@ -14,7 +14,14 @@ async function request(path, options = {}) {
   return data;
 }
 
-export const getHealth = () => request("/health");
 export const getRoot = () => request("/");
+export const getHealth = () => request("/health");
 export const postPredict = (payload) =>
   request("/predict", { method: "POST", body: JSON.stringify(payload) });
+
+// Analytics endpoints (dashboard charts)
+export const getMetrics = () => request("/metrics");
+export const getDiagnostics = () => request("/diagnostics");
+export const getCorrelation = () => request("/correlation");
+export const getPriceHistory = () => request("/price-history");
+export const getRuns = () => request("/runs");

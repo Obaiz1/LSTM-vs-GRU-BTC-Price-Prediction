@@ -1,179 +1,133 @@
-import { useEffect, useState } from "react";
-import { getHealth, postPredict } from "./api.js";
+import React, { useEffect, useState } from "react";
+import {
+  getCorrelation,
+  getDiagnostics,
+  getHealth,
+  getMetrics,
+  getPriceHistory,
+  getRuns,
+  postPredict,
+} from "./api.js";
+import { Icon } from "./components.jsx";
+import Forecast from "./tabs/Forecast.jsx";
+import Comparison from "./tabs/Comparison.jsx";
+import Diagnostics from "./tabs/Diagnostics.jsx";
+import Experiments from "./tabs/Experiments.jsx";
 
-const DEFAULT_FORM = {
-  open: 65000,
-  high: 66000,
-  low: 64000,
-  close: 65500,
-  volume: 32000000000,
-  ma_14: 64800,
-  rsi: 58.5,
-  macd: 120.3,
-  daily_return: 0.012,
-};
-
-const FIELDS = [
-  ["open", "Open"],
-  ["high", "High"],
-  ["low", "Low"],
-  ["close", "Close"],
-  ["volume", "Volume"],
-  ["ma_14", "MA 14"],
-  ["rsi", "RSI"],
-  ["macd", "MACD"],
-  ["daily_return", "Daily Return"],
+const TABS = [
+  ["forecast", "Forecast"],
+  ["comparison", "Model Comparison"],
+  ["diagnostics", "Training Diagnostics"],
+  ["experiments", "Experiments"],
 ];
 
+const DOCS_URL = `${import.meta.env.VITE_API_BASE || "/api"}/docs`;
+
 export default function App() {
-  const [form, setForm] = useState(DEFAULT_FORM);
-  const [modelVersion, setModelVersion] = useState("v2");
-  const [useLatest, setUseLatest] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState("forecast");
   const [health, setHealth] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [correlation, setCorrelation] = useState(null);
+  const [priceHistory, setPriceHistory] = useState(null);
+  const [runs, setRuns] = useState(null);
+
+  const [result, setResult] = useState(null);
+  const [predicting, setPredicting] = useState(false);
+  const [predictError, setPredictError] = useState(null);
 
   useEffect(() => {
-    getHealth()
-      .then(setHealth)
-      .catch(() => setHealth({ status: "unreachable" }));
+    getHealth().then(setHealth).catch(() => setHealth({ status: "down" }));
+    getMetrics().then(setMetrics).catch(() => {});
+    getDiagnostics().then(setDiagnostics).catch(() => {});
+    getCorrelation().then(setCorrelation).catch(() => {});
+    getPriceHistory().then(setPriceHistory).catch(() => {});
+    getRuns().then((d) => setRuns(d.runs || [])).catch(() => setRuns([]));
   }, []);
 
-  const onChange = (key, value) =>
-    setForm((f) => ({ ...f, [key]: value }));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setResult(null);
+  const onPredict = async (payload) => {
+    setPredicting(true);
+    setPredictError(null);
     try {
-      const payload = useLatest
-        ? { use_latest: true, model_version: modelVersion }
-        : {
-            ...Object.fromEntries(
-              Object.entries(form).map(([k, v]) => [k, Number(v)])
-            ),
-            model_version: modelVersion,
-          };
-      const data = await postPredict(payload);
-      setResult(data);
-    } catch (err) {
-      setError(err.message);
+      setResult(await postPredict(payload));
+    } catch (e) {
+      setPredictError(e.message);
+      setResult(null);
     } finally {
-      setLoading(false);
+      setPredicting(false);
     }
   };
 
+  const healthy = health && health.status === "ok";
+
   return (
-    <div className="page">
-      <header className="hero">
-        <h1>BTC Price Forecasting</h1>
-        <p className="subtitle">LSTM (V1) vs GRU (V2) · MLOps Deployment</p>
-        <HealthBadge health={health} />
-      </header>
+    <div className="min-h-screen pb-28">
+      {/* Top nav */}
+      <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 bg-surface/80 backdrop-blur-md border-b border-outline-variant">
+        <div className="flex items-center gap-3">
+          <Icon name="monitoring" className="text-primary text-2xl" />
+          <span className="text-headline-md font-headline font-bold text-primary">QuantForecaster</span>
+        </div>
+        <a
+          href={DOCS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors text-label-md"
+        >
+          <Icon name="api" className="text-base" /> API Docs
+        </a>
+      </nav>
 
-      <main className="grid">
-        <form className="card" onSubmit={submit}>
-          <h2>Prediction Input</h2>
-
-          <div className="row">
-            <label className="model-toggle">
-              Model version
-              <select
-                value={modelVersion}
-                onChange={(e) => setModelVersion(e.target.value)}
-              >
-                <option value="v2">V2 — GRU (improved)</option>
-                <option value="v1">V1 — LSTM (baseline)</option>
-              </select>
-            </label>
-
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={useLatest}
-                onChange={(e) => setUseLatest(e.target.checked)}
-              />
-              Use latest live data (Yahoo Finance)
-            </label>
+      <main className="max-w-container-max mx-auto mt-24 px-margin-mobile md:px-margin-desktop">
+        {/* Header */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-stack-md">
+          <div>
+            <h1 className="text-display-lg font-headline gradient-text">BTC Price Forecasting</h1>
+            <p className="text-on-surface-variant text-body-lg">LSTM (V1) vs GRU (V2) · MLOps Deployment</p>
           </div>
+          <div className="flex items-center gap-2 bg-surface-container-high px-4 py-2 rounded-full border border-outline-variant">
+            <span className={`w-2 h-2 rounded-full ${healthy ? "bg-green-500 animate-pulse" : "bg-error"}`} />
+            <span className="font-mono text-label-md text-on-surface-variant">
+              {health
+                ? `API: ${health.status} · V2 ${health.v2_model_exists ? "✓" : "✗"} · scaler ${health.scaler_exists ? "✓" : "✗"}`
+                : "connecting…"}
+            </span>
+          </div>
+        </header>
 
-          {!useLatest && (
-            <div className="fields">
-              {FIELDS.map(([key, label]) => (
-                <label key={key} className="field">
-                  <span>{label}</span>
-                  <input
-                    type="number"
-                    step="any"
-                    value={form[key]}
-                    onChange={(e) => onChange(key, e.target.value)}
-                  />
-                </label>
-              ))}
-            </div>
-          )}
+        {/* Tabs */}
+        <div className="flex items-center gap-8 border-b border-outline-variant mb-gutter overflow-x-auto whitespace-nowrap scrollbar-hide">
+          {TABS.map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`pb-4 font-bold tracking-wide text-label-md uppercase transition-all ${tab === id ? "tab-active" : "tab-inactive"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-          <button className="btn" type="submit" disabled={loading}>
-            {loading ? "Predicting…" : "Predict next price"}
-          </button>
-          {error && <p className="error">⚠️ {error}</p>}
-        </form>
-
-        <ResultCard result={result} />
+        {tab === "forecast" && (
+          <Forecast
+            onPredict={onPredict}
+            result={result}
+            predicting={predicting}
+            predictError={predictError}
+            priceHistory={priceHistory}
+            health={health}
+          />
+        )}
+        {tab === "comparison" && <Comparison metrics={metrics} correlation={correlation} />}
+        {tab === "diagnostics" && <Diagnostics diagnostics={diagnostics} />}
+        {tab === "experiments" && <Experiments runs={runs} />}
       </main>
 
-      <footer className="disclaimer">
-        ⚠️ Academic project for educational purposes only. <strong>Not financial
-        advice.</strong> Cryptocurrency prices are highly volatile and
-        unpredictable.
+      {/* Disclaimer */}
+      <footer className="fixed bottom-0 left-0 w-full z-50 flex items-center justify-center gap-2 py-2 px-4 text-center bg-error-container text-on-error-container font-mono text-label-sm">
+        <Icon name="warning" className="text-sm" />
+        <span>Academic project for educational purposes only. Not financial advice. Crypto prices are highly volatile.</span>
       </footer>
-    </div>
-  );
-}
-
-function HealthBadge({ health }) {
-  if (!health) return <span className="badge">checking…</span>;
-  const ok = health.status === "ok";
-  return (
-    <div className={`badge ${ok ? "ok" : "down"}`}>
-      API: {health.status}
-      {ok && (
-        <>
-          {" · "}V2 model: {health.v2_model_exists ? "✓" : "✗"}
-          {" · "}scaler: {health.scaler_exists ? "✓" : "✗"}
-        </>
-      )}
-    </div>
-  );
-}
-
-function ResultCard({ result }) {
-  if (!result) {
-    return (
-      <div className="card placeholder">
-        <h2>Result</h2>
-        <p>Submit the form to see a prediction.</p>
-      </div>
-    );
-  }
-  const up = result.trend === "Up";
-  return (
-    <div className="card result">
-      <h2>Result</h2>
-      <div className="price">${result.predicted_price.toLocaleString()}</div>
-      <div className={`trend ${up ? "up" : "down"}`}>
-        {up ? "▲" : "▼"} {result.trend} · {result.pct_change}%
-      </div>
-      <ul className="meta">
-        <li><span>Last close</span><b>${result.last_close.toLocaleString()}</b></li>
-        <li><span>Change</span><b>${result.change.toLocaleString()}</b></li>
-        <li><span>Signal</span><b>{result.confidence_signal}</b></li>
-        <li><span>Model</span><b>{result.model_version}</b></li>
-      </ul>
-      <p className="note">{result.message}</p>
     </div>
   );
 }

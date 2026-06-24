@@ -1,0 +1,20 @@
+{
+  "version_key": "v1",
+  "name": "v1_lstm_baseline",
+  "params": {
+    "lookback": 60,
+    "epochs": 50,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "optimizer": "Adam",
+    "architecture": "LSTM(64) -> Dense(1)"
+  },
+  "metrics": {
+    "MAE": 5763.939001445375,
+    "RMSE": 6770.517902120491,
+    "R2": 0.8356598409262627,
+    "directional_accuracy": 0.4952076677316294
+  },
+  "val_loss": 0.0003700010711327195,
+  "train_time_sec": 247.2
+}
