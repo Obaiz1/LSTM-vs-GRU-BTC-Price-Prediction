@@ -1,0 +1,25 @@
+# ----- Web / API -----
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+
+# ----- Dashboard -----
+streamlit
+
+# ----- Data / ML -----
+pandas
+numpy
+plotly
+scikit-learn
+tensorflow
+yfinance
+
+# ----- MLOps / experiment tracking -----
+mlflow
+joblib
+matplotlib
+
+# ----- Testing -----
+pytest
+httpx

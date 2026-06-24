@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.git/
+.github/
+.venv/
+venv/
+frontend/node_modules/
+frontend/dist/
+mlruns/
+*.md
+.vscode/
+.idea/

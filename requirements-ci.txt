@@ -1,0 +1,4 @@
+# Lightweight dependencies for CI (no TensorFlow / no heavy training).
+pytest
+ruff
+pyyaml

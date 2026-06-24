@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+
+# Python envs
+venv/
+.venv/
+
+# MLflow local tracking store
+mlruns/
+
+# Node / React frontend
+frontend/node_modules/
+frontend/dist/
+
+# Local tooling / caches
+.claude/
+.pytest_cache/
+mlflow.db

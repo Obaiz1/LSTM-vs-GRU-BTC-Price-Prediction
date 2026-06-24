@@ -1,0 +1,29 @@
+# Local multi-service stack: FastAPI prediction API + MLflow tracking UI.
+#   docker compose up --build
+services:
+  btc-api:
+    build: .
+    image: btc-price-final:v1
+    container_name: btc-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri /mlflow/mlruns
+      --default-artifact-root /mlflow/mlruns
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+    restart: unless-stopped
