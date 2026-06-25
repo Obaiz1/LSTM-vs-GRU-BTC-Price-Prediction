@@ -184,6 +184,15 @@ def export_shared_data() -> None:
         with open(os.path.join(ARTIFACTS_DIR, "price_history.json"), "w") as f:
             json.dump({"dates": [str(d)[:10] for d in tail["Date"].values],
                        "close": [float(x) for x in tail["Close"].values]}, f)
-        print("[analytics] Exported correlation + price_history JSON.")
+
+        # Cache the most recent feature window so the API can still serve
+        # "use latest" / single-record predictions when live Yahoo Finance is
+        # unreachable (e.g. on Hugging Face Spaces' restricted network).
+        window = feats[FEATURE_COLS].tail(120)
+        with open(os.path.join(ARTIFACTS_DIR, "latest_window.json"), "w") as f:
+            json.dump({"feature_cols": list(FEATURE_COLS),
+                       "rows": window.values.astype(float).tolist(),
+                       "last_date": str(feats["Date"].values[-1])[:10]}, f)
+        print("[analytics] Exported correlation + price_history + latest_window JSON.")
     except Exception as exc:  # network failure must not break training
         print(f"[analytics] Skipped shared data export: {exc}")

@@ -125,11 +125,51 @@ def _records_to_matrix(records: List[Dict], feature_cols: List[str]) -> np.ndarr
     return np.asarray(rows, dtype="float32")
 
 
+_CACHED_WINDOW_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "artifacts", "latest_window.json",
+)
+
+
+def _cached_feature_window(lookback: int, feature_cols: List[str]) -> np.ndarray:
+    """Load the feature window cached at training time (offline fallback)."""
+    import json
+
+    with open(_CACHED_WINDOW_PATH, "r") as f:
+        bundle = json.load(f)
+    cols = bundle["feature_cols"]
+    rows = np.asarray(bundle["rows"], dtype="float32")
+    # Reorder columns to the requested order, then take the last `lookback` rows.
+    idx = [cols.index(c) for c in feature_cols]
+    return rows[:, idx][-lookback:]
+
+
 def latest_feature_window(lookback: int, feature_cols: List[str]) -> np.ndarray:
-    """Fetch live BTC data and return the most recent ``lookback`` rows (raw)."""
-    raw = load_btc_data()
-    feats = engineer_features(raw)
-    return feats[feature_cols].tail(lookback).values.astype("float32")
+    """
+    Return the most recent ``lookback`` raw feature rows.
+
+    Tries live Yahoo Finance first; if that is unavailable or returns too few
+    rows (e.g. restricted network on Hugging Face Spaces), falls back to the
+    feature window cached at training time (``artifacts/latest_window.json``).
+    """
+    try:
+        feats = engineer_features(load_btc_data())
+        window = feats[feature_cols].tail(lookback).values.astype("float32")
+        if len(window) >= lookback:
+            return window
+    except Exception:
+        pass  # fall through to the cached window
+
+    if os.path.exists(_CACHED_WINDOW_PATH):
+        cached = _cached_feature_window(lookback, feature_cols)
+        if len(cached) >= lookback:
+            return cached
+
+    raise FileNotFoundError(
+        "Live data is unavailable and no cached feature window was found. "
+        "Send a 'sequence' of 60 records, or retrain to generate "
+        "artifacts/latest_window.json."
+    )
 
 
 def build_model_input(
