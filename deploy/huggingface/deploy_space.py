@@ -33,6 +33,7 @@ IGNORE = [
     ".pytest_cache/*", ".pytest_cache/**",
     ".claude/*", ".claude/**",
     "deploy/huggingface/*",  # the Space README is uploaded explicitly below
+    "README.md",  # keep the Space manifest README; don't overwrite with project README
 ]
 
 
