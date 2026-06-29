@@ -1,6 +1,6 @@
 // Central API client. In dev, Vite proxies "/api" -> http://localhost:8000.
-// Override with VITE_API_BASE (e.g. the container/Minikube URL) at build time.
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+// In production (Vercel), calls the HuggingFace Space backend directly.
+const API_BASE = import.meta.env.VITE_API_BASE || "https://obaiz-btc-forecasting-api.hf.space";
 
 async function request(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {

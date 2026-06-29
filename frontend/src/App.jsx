@@ -21,7 +21,7 @@ const TABS = [
   ["experiments", "Experiments"],
 ];
 
-const DOCS_URL = `${import.meta.env.VITE_API_BASE || "/api"}/docs`;
+const DOCS_URL = `${import.meta.env.VITE_API_BASE || "https://obaiz-btc-forecasting-api.hf.space"}/docs`;
 
 export default function App() {
   const [tab, setTab] = useState("forecast");
